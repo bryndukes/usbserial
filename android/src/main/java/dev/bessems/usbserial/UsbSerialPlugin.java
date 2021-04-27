@@ -37,6 +37,8 @@ public class UsbSerialPlugin implements MethodCallHandler, EventChannel.StreamHa
     private int m_InterfaceId;
     private Registrar m_Registrar;
     private EventChannel.EventSink m_EventSink;
+    private UsbSerialDevice m_SerialDeviceDevice;
+    private UsbDeviceConnection m_Connection;
 
     private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
     public static final String ACTION_USB_ATTACHED = "android.hardware.usb.action.USB_DEVICE_ATTACHED";
@@ -148,23 +150,22 @@ public class UsbSerialPlugin implements MethodCallHandler, EventChannel.StreamHa
         };
 
         try {
-            UsbDeviceConnection connection = m_Manager.openDevice(device);
+            m_Connection = m_Manager.openDevice(device);
 
-            if ( connection == null && allowAcquirePermission ) {
+            if ( m_Connection == null && allowAcquirePermission ) {
                 acquirePermissions(device, cb);
                 return;
             }
 
-            UsbSerialDevice serialDeviceDevice;
             if ( type.equals("") ) {
-                serialDeviceDevice = UsbSerialDevice.createUsbSerialDevice(device, connection, iface);
+                m_SerialDeviceDevice = UsbSerialDevice.createUsbSerialDevice(device, m_Connection, iface);
             } else {
-                serialDeviceDevice = UsbSerialDevice.createUsbSerialDevice(type, device, connection, iface);
+                m_SerialDeviceDevice = UsbSerialDevice.createUsbSerialDevice(type, device, m_Connection, iface);
             }
 
-            if (serialDeviceDevice != null) {
+            if (m_SerialDeviceDevice != null) {
                 int interfaceId = m_InterfaceId++;
-                UsbSerialPortAdapter adapter = new UsbSerialPortAdapter(m_Registrar, interfaceId, connection, serialDeviceDevice);
+                UsbSerialPortAdapter adapter = new UsbSerialPortAdapter(m_Registrar, interfaceId, m_Connection, m_SerialDeviceDevice);
                 result.success(adapter.getMethodChannelName());
                 Log.d(TAG, "success.");
                 return;
@@ -229,6 +230,21 @@ public class UsbSerialPlugin implements MethodCallHandler, EventChannel.StreamHa
         result.success(transferDevices);
     }
 
+    private void initFlowControlHandler(){
+        try {
+            if (m_SerialDeviceDevice != null) {
+                int interfaceId = m_InterfaceId++;
+                FlowControlHandler flowControlHandler = new FlowControlHandler(m_Registrar, interfaceId, m_Connection, m_SerialDeviceDevice);
+                result.success(flowControlHandler.getMethodChannelName());
+                Log.d(TAG, "success");
+                return;
+            }
+            result.error(TAG, "Not a Serial device.", null);
+        } catch ( java.lang.Exception e ) {
+            result.error(TAG, "Failed to acquire Flow Control Handler for device.", null);
+        }
+    }
+
 
     @Override
     public void onListen(Object o, EventChannel.EventSink eventSink) {
@@ -264,7 +280,9 @@ public class UsbSerialPlugin implements MethodCallHandler, EventChannel.StreamHa
             case "listDevices":
                 listDevices(result);
                 break;
-
+            case "getFlowControlChannel":
+                initFlowControlHandler();
+                break;
             default:
                 result.notImplemented();
                 break;
