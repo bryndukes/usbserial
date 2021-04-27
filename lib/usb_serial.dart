@@ -90,18 +90,21 @@ class UsbPort extends AsyncDataSinkSource {
   static const int STOPBITS_2 = 2;
 
   final MethodChannel _channel;
+  final MethodChannel _flowControlChannel;
   final EventChannel _eventChannel;
+  final EventChannel _flowControlEventChannel;
   Stream<Uint8List> _inputStream;
+  Stream<bool> _flowControlStream;
 
-  UsbPort._internal(this._channel, this._eventChannel);
+  UsbPort._internal(this._channel, this._flowControlChannel, this._eventChannel, this._flowControlEventChannel);
 
   /// Factory to create UsbPort object.
   ///
   /// You don't need to use this directly as you get UsbPort from
   /// [UsbDevice.create].
-  factory UsbPort(String methodChannelName) {
-    return UsbPort._internal(MethodChannel(methodChannelName),
-        EventChannel(methodChannelName + "/stream"));
+  factory UsbPort(String methodChannelName, String flowControlMethodChannelName) {
+    return UsbPort._internal(MethodChannel(methodChannelName), MethodChannel(flowControlMethodChannelName),
+        EventChannel(methodChannelName + "/stream"), EventChannel(flowControlMethodChannelName + "/stream"));
   }
 
   /// returns the asynchronous input stream.
@@ -124,6 +127,16 @@ class UsbPort extends AsyncDataSinkSource {
           .map<Uint8List>((dynamic value) => value);
     }
     return _inputStream;
+  }
+
+  @override
+  Stream<bool> get flowControlStream {
+    if (_flowControlStream == null) {
+      _flowControlStream = _flowControlEventChannel
+          .receiveBroadcastStream()
+          .map<bool>((dynamic value) => value);
+    }
+    return _flowControlStream;
   }
 
   /// Opens the uart communication channel.
@@ -171,7 +184,7 @@ class UsbPort extends AsyncDataSinkSource {
 
   /// Sets the flow control parameter.
   Future<void> setFlowControl(int flowControl) async {
-    return await _channel
+    return await _flowControlChannel
         .invokeMethod("setFlowControl", {"flowControl": flowControl});
   }
 }
@@ -302,11 +315,13 @@ class UsbSerial {
       "interface": interface
     });
 
-    if (methodChannelName == null) {
+    String flowControlMethodChannelName = await _channel.invokeMethod("getFlowControlChannel");
+
+    if (methodChannelName == null || flowControlMethodChannelName == null) {
       return null;
     }
 
-    return new UsbPort(methodChannelName);
+    return new UsbPort(methodChannelName, flowControlMethodChannelName);
   }
 
   /// Creates a UsbPort from deviceId optionally type and interface.
@@ -327,11 +342,17 @@ class UsbSerial {
       "interface": interface
     });
 
+    String flowControlMethodChannelName = await _channel.invokeMethod("getFlowControlChannel");
+
     if (methodChannelName == null) {
       return null;
     }
 
-    return new UsbPort(methodChannelName);
+    if (methodChannelName == null || flowControlMethodChannelName == null) {
+      return null;
+    }
+
+    return new UsbPort(methodChannelName, flowControlMethodChannelName);
   }
 
   /// Returns a list of UsbDevices currently plugged in.
