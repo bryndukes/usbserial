@@ -230,7 +230,7 @@ public class UsbSerialPlugin implements MethodCallHandler, EventChannel.StreamHa
         result.success(transferDevices);
     }
 
-    private void initFlowControlHandler(){
+    private void initFlowControlHandler(Result result){
         try {
             if (m_SerialDeviceDevice != null) {
                 int interfaceId = m_InterfaceId++;
@@ -281,7 +281,7 @@ public class UsbSerialPlugin implements MethodCallHandler, EventChannel.StreamHa
                 listDevices(result);
                 break;
             case "getFlowControlChannel":
-                initFlowControlHandler();
+                initFlowControlHandler(result);
                 break;
             default:
                 result.notImplemented();
