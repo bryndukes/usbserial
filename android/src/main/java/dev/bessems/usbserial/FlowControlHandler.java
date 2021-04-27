@@ -63,7 +63,7 @@ public class FlowControlHandler implements MethodCallHandler, EventChannel.Strea
                 }
             };
 
-            m_SerialDevice.GetCTS(ctsCallback);
+            m_SerialDevice.getCTS(ctsCallback);
         }
     }
 
